@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Urchin fold-flat tenting case: concept</title>
+<style>
+  :root { color-scheme: light dark; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font: 13px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; background: #e9e6e1; }
+  #panel { position: absolute; top: 12px; left: 12px; width: 300px; max-height: calc(100% - 24px); overflow: auto; background: rgba(255,255,255,0.94); border-radius: 10px; padding: 12px 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.15); }
+  #panel h1 { font-size: 15px; margin: 0 0 4px; }
+  #panel h2 { font-size: 12px; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: 0.04em; color: #666; }
+  .row { display: grid; grid-template-columns: 120px 1fr 44px; align-items: center; gap: 6px; margin: 4px 0; }
+  .row input[type=range] { width: 100%; }
+  .row span { text-align: right; font-variant-numeric: tabular-nums; }
+  .btns { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  button { font: inherit; padding: 5px 10px; border-radius: 6px; border: 1px solid #bbb; background: #fff; cursor: pointer; }
+  button.primary { background: #2f6fde; color: #fff; border-color: #2f6fde; }
+  label.chk { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  td { padding: 2px 0; } td:last-child { text-align: right; }
+  .warn { color: #c0392b; font-weight: 600; }
+  .note { color: #666; font-size: 12px; }
+  @media (prefers-color-scheme: dark) {
+    html, body { background: #1b1d21; color: #e6e6e6; }
+    #panel { background: rgba(32,34,38,0.94); box-shadow: 0 2px 12px rgba(0,0,0,0.5); }
+    #panel h2, .note { color: #9a9ea6; }
+    button { background: #2c2f34; color: #e6e6e6; border-color: #4a4e55; }
+    button.primary { background: #3b7cf0; border-color: #3b7cf0; color: #fff; }
+    .warn { color: #ff7b6b; }
+  }
+  .lbl { font: 11px -apple-system, sans-serif; background: rgba(20,20,20,0.78); color: #fff; padding: 2px 6px; border-radius: 4px; white-space: nowrap; pointer-events: none; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="panel">
+  <h1>Urchin fold-flat tenting case</h1>
+  <div class="note">Concept only. Board outline, key positions and mounting holes come from the Urchin KiCad file; everything else is a first guess.</div>
+
+  <h2>Fold</h2>
+  <div class="btns">
+    <button class="primary" id="raise">Raise</button>
+    <button id="fold">Fold flat</button>
+  </div>
+  <div class="row"><label>Position</label><input id="t" type="range" min="0" max="1" step="0.001" value="1"><span id="tv"></span></div>
+
+  <h2>Design</h2>
+  <div class="btns">
+    <button id="mode-nest" class="primary">Sunk base</button>
+    <button id="mode-base">Base on top</button>
+    <button id="mode-kick">Kickstand only</button>
+  </div>
+  <div class="row"><label>Tent angle</label><input id="ang" type="range" min="55" max="85" step="1" value="75"><span id="angv"></span></div>
+  <div class="row"><label id="uhl">Strut hinge from outer edge</label><input id="uh" type="range" min="15" max="70" step="1" value="50"><span id="uhv"></span></div>
+  <div class="row"><label id="fll">Strut length</label><input id="fl" type="range" min="25" max="90" step="1" value="54"><span id="flv"></span></div>
+  <div class="row" id="baseRow"><label>Steel base plate</label><input id="baseT" type="range" min="0" max="5" step="0.5" value="3"><span id="baseTv"></span></div>
+  <div><label class="chk"><input id="steelFlap" type="checkbox"> Steel strut / kickstand (2 mm)</label></div>
+
+  <h2>Desk</h2>
+  <div class="row"><label>Laptop case width</label><input id="lw" type="range" min="120" max="360" step="5" value="240"><span id="lwv"></span></div>
+  <div class="row"><label>Laptop case height</label><input id="lh" type="range" min="5" max="60" step="1" value="20"><span id="lhv"></span></div>
+  <div class="row"><label>Gap to laptop case</label><input id="gap" type="range" min="0" max="60" step="1" value="0"><span id="gapv"></span></div>
+
+  <h2>Show</h2>
+  <div>
+    <label class="chk"><input id="xray" type="checkbox"> X-ray case</label>
+    <label class="chk"><input id="labels" type="checkbox" checked> Labels</label>
+    <label class="chk"><input id="laptop" type="checkbox" checked> Laptop case</label>
+  </div>
+  <div class="btns">
+    <button data-view="iso">Iso</button><button data-view="front">Front</button><button data-view="top">Top</button><button data-view="back">Kickstand side</button><button data-view="under">Underside</button><button data-view="end">End on</button>
+  </div>
+
+  <h2>Numbers at full tent</h2>
+  <table id="stats"></table>
+  <div id="warn" class="warn"></div>
+  <p class="note">Stability is a rough estimate. Masses: electronics, switches and keycaps 60 g, printed case 30 g, printed parts at nylon density, steel at 7.85 g/cm³. "Tips" is the force on the worst-placed key that would roll the half inward over its innermost support, with no laptop case. "Slides" assumes silicone feet (friction 0.8). For scale: Choc switches actuate at 35–60 gf, and a firm keystroke peaks at roughly 100–300 gf.</p>
+  <p class="note">Drag to orbit, scroll to zoom, right-drag to pan. Hinges swing freely on steel pins; the angle comes from a fixed triangle and a hard stop, so nothing relies on friction and nothing needs tightening.</p>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+// Generated by tools/extract_pcb.py from the Urchin KiCad PCB (right-hand half).
+const DATA = {"outline": [[17.6, 36.0], [36.0, 36.0], [36.32, 35.6], [36.38, 26.19], [36.64, 25.62], [42.42, 23.17], [49.1, 20.85], [58.89, 18.34], [67.87, 16.89], [77.95, 16.2], [87.06, 16.46], [91.09, 16.95], [96.07, 17.92], [100.96, 19.26], [105.74, 20.97], [110.37, 23.04], [114.82, 25.46], [119.08, 28.22], [122.33, 30.65], [127.07, 34.9], [127.13, 48.29], [127.13, 48.72], [127.13, 70.38], [127.13, 70.87], [127.1, 85.64], [126.72, 86.11], [121.98, 88.15], [115.09, 90.34], [109.02, 91.57], [102.85, 92.19], [71.72, 92.3], [66.64, 92.64], [61.61, 93.36], [54.68, 95.0], [47.97, 97.35], [42.43, 99.91], [32.29, 105.69], [31.72, 105.77], [31.26, 105.42], [19.22, 84.5], [18.14, 81.61], [17.6, 77.53]], "keys": [[63.76, 31.81, 0.0], [117.76, 60.31, 0.0], [81.76, 42.31, 0.0], [99.76, 48.31, 0.0], [117.76, 43.31, 0.0], [99.76, 65.31, 0.0], [117.76, 77.31, 0.0], [81.76, 25.31, 0.0], [45.76, 51.31, 0.0], [53.86, 86.01, 15.0], [45.76, 34.31, 0.0], [63.76, 65.81, 0.0], [99.76, 31.31, 0.0], [35.32, 93.69, 30.0], [63.76, 48.81, 0.0], [81.76, 59.31, 0.0], [45.76, 68.31, 0.0]], "holes": [[108.76, 68.81], [34.38, 38.06], [23.5, 87.96], [40.48, 79.92], [109.22, 34.46], [19.6, 38.06], [54.76, 40.31], [72.76, 68.81]], "nano": [26.991222, 57.927386]};
+
+// Fixed dimensions (mm). u is measured inward from the case's outer (pinky-side) face.
+const WALL = 3.0;                 // wall plus clearance around the PCB
+const PCB_OUTER_X = 127.13;       // KiCad x of the straight pinky-side PCB edge
+const U0 = PCB_OUTER_X + WALL;    // u = U0 - x
+const ZC = 61;                    // KiCad y of the board's front-back centre
+const RECESS = 4.0;               // kickstand recess depth in the floor
+const FLAP_T = 3.2;               // kickstand thickness
+const PCB_Z = 7.4;                // PCB underside height above the case bottom
+const PCB_T = 1.6;
+const TOP_Z = PCB_Z + PCB_T + 2.2; // integrated switch plate top
+const CAP_Z0 = TOP_Z + 2.0, CAP_H = 2.6;
+const PAD = 1.0;                  // silicone feet thickness
+const BEVEL_B = 2.6;              // bevel starts this far in from the outer face
+const FLAP_Z0 = 40 - ZC, FLAP_Z1 = 86 - ZC;
+const CASE_INNER_U = U0 - 17.6 + WALL;
+const deg = Math.PI / 180;
+
+// Height of the kickstand hinge axis above the desk at tilt phi, and the extra rotation
+// (beyond phi) that puts the kickstand's foot pad on the desk.
+// Kickstand mode: the case pivots on its bevel and the foot lands on the desk.
+// Base mode: the case pivots on a hinge at its outer bottom corner and the strut lands on the base.
+const pivotOffset = () => P.mode === 'kick' ? BEVEL_B : 0;
+function flapGeom(phi) {
+  const kick = P.mode === 'kick';
+  const hingeH = (kick ? PAD : 0) + (P.uh - pivotOffset()) * Math.sin(phi) + (RECESS / 2) * Math.cos(phi);
+  const drop = hingeH - FLAP_T / 2 - (kick ? 1.3 : 0.2);
+  const reaches = P.fl > drop;
+  const lift = Math.asin(Math.min(1, Math.max(0, drop / P.fl)));
+  return { hingeH, drop, reaches, lift };
+}
+
+const P = { t: 1, ang: 75, uh: 50, fl: 54, lw: 240, lh: 20, gap: 0, baseT: 3, mode: 'nest', steelFlap: false };
+const MODE_DEFAULTS = { nest: { uh: 50, fl: 54 }, base: { uh: 45, fl: 60 }, kick: { uh: 34, fl: 50 } };
+const RIM = BEVEL_B;              // sunk base: case rim around the plate; the plate's outer edge sits on the hinge line
+const NEST_W = 40;                // sunk base: strut width
+const NEST_Z = 2;                 // sunk base: strut centre line (front-back)
+const NEST_SPLIT = 0.6;           // sunk base: share of the fold animation spent tilting before the strut swings
+
+// Sunk base: the strut is hinged on the plate at distance f from the main hinge and its tip
+// meets the recess ceiling of the tilted case. Returns where it meets (s, along the case)
+// and the strut's swing angle beta from lying flat.
+function nestGeom(phi) {
+  const zp = nestPivotZ(), hC = RECESS - zp, f = P.uh, L = P.fl;
+  const a = f + hC * Math.sin(phi), c = hC * Math.cos(phi);
+  const bq = a * Math.cos(phi) - c * Math.sin(phi);
+  const disc = bq * bq - (a * a + c * c - L * L);
+  if (disc < 0) return { ok: false, s: NaN, beta: Math.PI / 2 };
+  const sv = bq + Math.sqrt(disc);
+  const dx = f - sv * Math.cos(phi) + hC * Math.sin(phi), dy = sv * Math.sin(phi) + hC * Math.cos(phi);
+  return { ok: true, s: sv, beta: Math.atan2(dy, -dx) };
+}
+const nestBaseT = () => Math.min(Math.max(P.baseT, 0.5), RECESS - 0.5);
+const nestPivotZ = () => nestBaseT() / 2;
+const STEEL = 7.85e-3, NYLON = 1.0e-3;   // g/mm³
+
+// --- renderer, scene ----------------------------------------------------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.localClippingEnabled = true;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(innerWidth, innerHeight);
+Object.assign(labelRenderer.domElement.style, { position: 'absolute', top: '0', pointerEvents: 'none' });
+document.body.appendChild(labelRenderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color();
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 1, 5000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 40, 0);
+camera.position.set(260, 300, 560);
+controls.update();
+
+const hemi = new THREE.HemisphereLight(0xffffff, 0x8a7f72, 1.6);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+sun.position.set(180, 420, 260);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -400, right: 400, top: 400, bottom: -400, near: 10, far: 1200 });
+sun.shadow.bias = -0.0005;
+scene.add(sun);
+
+const desk = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000), new THREE.MeshStandardMaterial({ color: 0xcdb497, roughness: 0.9 }));
+desk.rotation.x = -Math.PI / 2;
+desk.receiveShadow = true;
+scene.add(desk);
+
+const laptop = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0x4a4f57, roughness: 1 }));
+
+// Follows the system light/dark setting, including live changes.
+const darkQuery = matchMedia('(prefers-color-scheme: dark)');
+function applyTheme() {
+  const dark = darkQuery.matches;
+  scene.background.set(dark ? 0x1b1d21 : 0xe9e6e1);
+  desk.material.color.set(dark ? 0x4a4038 : 0xcdb497);
+  laptop.material.color.set(dark ? 0x6b717b : 0x4a4f57);
+  hemi.intensity = dark ? 1.3 : 1.6;
+}
+applyTheme();
+darkQuery.addEventListener('change', applyTheme);
+laptop.castShadow = laptop.receiveShadow = true;
+scene.add(laptop);
+
+// --- geometry helpers ------------------------------------------------------
+const toLocal = ([x, y]) => [BEVEL_B - (U0 - x), y - ZC];   // [X, Z] in the half's pivot frame
+const uToX = u => BEVEL_B - u;
+
+function signedArea(pts) {
+  let a = 0;
+  for (let i = 0; i < pts.length; i++) { const [x1, y1] = pts[i], [x2, y2] = pts[(i + 1) % pts.length]; a += x1 * y2 - x2 * y1; }
+  return a / 2;
+}
+function offsetPolygon(pts, d) {
+  const s = signedArea(pts) > 0 ? 1 : -1;
+  const n = pts.length, out = [];
+  const normal = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy); return [s * dy / l, -s * dx / l]; };
+  for (let i = 0; i < n; i++) {
+    const a = pts[(i - 1 + n) % n], b = pts[i], c = pts[(i + 1) % n];
+    const n1 = normal(a, b), n2 = normal(b, c);
+    let mx = n1[0] + n2[0], my = n1[1] + n2[1];
+    const ml = Math.hypot(mx, my) || 1; mx /= ml; my /= ml;
+    const k = d / Math.max(0.35, mx * n1[0] + my * n1[1]);
+    out.push([b[0] + mx * k, b[1] + my * k]);
+  }
+  return out;
+}
+// Shapes are drawn in (X, -Z) and extruded upwards, so they land in the X-Z plane.
+function shapeFrom(pts) { const sh = new THREE.Shape(); pts.forEach(([x, z], i) => i ? sh.lineTo(x, -z) : sh.moveTo(x, -z)); sh.closePath(); return sh; }
+function rectPath(x0, x1, z0, z1) { return shapeFrom([[x0, z0], [x1, z0], [x1, z1], [x0, z1]]); }
+function extrude(shape, y0, h) {
+  const g = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false, curveSegments: 4 });
+  g.rotateX(-Math.PI / 2); g.translate(0, y0, 0); return g;
+}
+function label(text, obj, pos) {
+  const el = document.createElement('div'); el.className = 'lbl'; el.textContent = text;
+  const o = new CSS2DObject(el); o.position.copy(pos); obj.add(o); labels.push(o); return o;
+}
+const labels = [];
+
+const pcbLocal = DATA.outline.map(toLocal);
+const caseLocal = offsetPolygon(pcbLocal, WALL);
+
+// --- one half (built for the right hand; the left is a mirror) -----------
+const keyCapGeo = new RoundedBoxGeometry(17.4, CAP_H, 16.4, 2, 0.9);
+const switchGeo = new THREE.BoxGeometry(15, 1.0, 15);
+
+function polyCentroid(pts) {
+  let a = 0, cx = 0, cz = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const [x1, z1] = pts[i], [x2, z2] = pts[(i + 1) % pts.length], c = x1 * z2 - x2 * z1;
+    a += c; cx += (x1 + x2) * c; cz += (z1 + z2) * c;
+  }
+  return { area: Math.abs(a / 2), x: cx / (3 * a), z: cz / (3 * a) };
+}
+const caseC = polyCentroid(caseLocal), pcbC = polyCentroid(pcbLocal);
+const STRAIGHT_Z0 = 35 - ZC, STRAIGHT_Z1 = 85 - ZC;   // straight pinky-side edge, used for the main hinge
+
+function massMarker(parent, mass, pos) {
+  const m = new THREE.Object3D(); m.position.copy(pos); m.userData.mass = mass; parent.add(m); return m;
+}
+
+function buildHalf(mirror) {
+  const side = new THREE.Group();
+  if (mirror) side.scale.x = -1;
+  scene.add(side);
+  const pivot = new THREE.Group();
+  side.add(pivot);
+  const body = new THREE.Group();
+  pivot.add(body);
+  const base = new THREE.Group();
+  side.add(base);
+  const markers = [];
+
+  const bevelLocal = new THREE.Plane();
+  const bevelWorld = new THREE.Plane();
+  const caseMat = new THREE.MeshStandardMaterial({ color: 0x5b7083, roughness: 0.55, side: THREE.DoubleSide, clippingPlanes: [bevelWorld], clipShadows: true });
+  const caseMatTop = caseMat.clone(); caseMatTop.clippingPlanes = [bevelWorld];
+  const plainCaseMat = new THREE.MeshStandardMaterial({ color: 0x5b7083, roughness: 0.55 });
+  const pcbMat = new THREE.MeshStandardMaterial({ color: 0x1f5fa8, roughness: 0.6 });
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x202124, roughness: 0.45 });
+  const swMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 });
+  const flapMat = new THREE.MeshStandardMaterial({ color: 0xd9822b, roughness: 0.5, side: THREE.DoubleSide });
+  const flapSteelMat = new THREE.MeshStandardMaterial({ color: 0x8d949c, metalness: 0.85, roughness: 0.35, side: THREE.DoubleSide });
+  const steelMat = new THREE.MeshStandardMaterial({ color: 0xb8bcc2, metalness: 0.9, roughness: 0.3 });
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0x6f757c, metalness: 0.8, roughness: 0.45, side: THREE.DoubleSide });
+  const padMat = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 1 });
+  const magMat = new THREE.MeshStandardMaterial({ color: 0x9aa3ad, metalness: 0.8, roughness: 0.35 });
+
+  const parts = { bottom: new THREE.Mesh(undefined, caseMat), top: new THREE.Mesh(undefined, caseMatTop) };
+  for (const m of Object.values(parts)) { m.castShadow = m.receiveShadow = true; body.add(m); }
+  markers.push(massMarker(body, 30, new THREE.Vector3(caseC.x, TOP_Z / 2, caseC.z)));
+
+  body.add(new THREE.Mesh(extrude(shapeFrom(pcbLocal), PCB_Z, PCB_T), pcbMat));
+  markers.push(massMarker(body, 60, new THREE.Vector3(pcbC.x, PCB_Z + 3, pcbC.z)));
+
+  for (const [x, y, rot] of DATA.keys) {
+    const [X, Z] = toLocal([x, y]);
+    const g = new THREE.Group(); g.position.set(X, 0, Z); g.rotation.y = rot * deg;
+    const sw = new THREE.Mesh(switchGeo, swMat); sw.position.y = TOP_Z + 0.5; g.add(sw);
+    const cap = new THREE.Mesh(keyCapGeo, capMat); cap.position.y = CAP_Z0 + CAP_H / 2; cap.castShadow = true; cap.userData.keycap = true; g.add(cap);
+    body.add(g);
+  }
+
+  // nice!nano + nice!view stack with a cover, and the USB-C port at the back end
+  const [NX, NZ] = toLocal(DATA.nano);
+  const mcu = new THREE.Mesh(new RoundedBoxGeometry(21, 4, 38, 2, 1.2), plainCaseMat);
+  mcu.position.set(NX, TOP_Z + 2, NZ - 1); mcu.castShadow = true; body.add(mcu);
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(12, 27), new THREE.MeshStandardMaterial({ color: 0xc9cfc6, roughness: 0.3, emissive: 0x30352f }));
+  screen.rotation.x = -Math.PI / 2; screen.position.set(NX, TOP_Z + 4.05, NZ); body.add(screen);
+  const usb = new THREE.Mesh(new RoundedBoxGeometry(9, 3.2, 7, 2, 1.2), steelMat);
+  usb.position.set(NX, TOP_Z + 1.6, NZ - 20.5); body.add(usb);
+
+  // screws in the floor at the PCB mounting holes
+  const screwGeo = new THREE.CylinderGeometry(1.9, 1.9, 0.4, 20);
+  for (const h of DATA.holes) { const [X, Z] = toLocal(h); const s = new THREE.Mesh(screwGeo, steelMat); s.position.set(X, -0.15, Z); body.add(s); }
+
+  // kickstand mode only: silicone strip on the bevel (the pivot) plus round bumpers for lying flat
+  const bevelStrip = new THREE.Mesh(new THREE.BoxGeometry(1, PAD, 46), padMat);
+  bevelStrip.castShadow = true; body.add(bevelStrip);
+  const bumperGeo = new THREE.CylinderGeometry(3.5, 3.5, PAD, 24);
+  const caseBumpers = [[12, -22], [12, 20], [102, -14], [102, 30]].map(([u, z]) => {
+    const b = new THREE.Mesh(bumperGeo, padMat); b.position.set(uToX(u), -PAD / 2, z); body.add(b); return b;
+  });
+
+  // steel weights in floor pockets near the outer edge
+  const weightGeo = new THREE.BoxGeometry(15.5, RECESS - 0.4, 17.5);
+  const WEIGHT_MASS = 15.5 * 17.5 * (RECESS - 0.4) * STEEL;
+  const weights = [-11, 11].map(z => {
+    const w = new THREE.Mesh(weightGeo, steelMat); w.position.set(uToX(14), RECESS / 2 + 0.2, z); body.add(w);
+    w.userData.marker = massMarker(body, WEIGHT_MASS, w.position); markers.push(w.userData.marker);
+    return w;
+  });
+
+  // kickstand / strut
+  const flapPivot = new THREE.Group(); body.add(flapPivot);
+  const flap = new THREE.Mesh(undefined, flapMat); flap.castShadow = true; flapPivot.add(flap);
+  const flapFoot = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1, FLAP_Z1 - FLAP_Z0 - 4), padMat); flapPivot.add(flapFoot);
+  const flapMarker = massMarker(flapPivot, 0, new THREE.Vector3());
+  markers.push(flapMarker);
+  const flapEnd = new THREE.Object3D(); flapPivot.add(flapEnd);
+  const pin = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, FLAP_Z1 - FLAP_Z0 + 4, 16), steelMat);
+  pin.rotation.x = Math.PI / 2; flapPivot.add(pin);
+  const knuckles = [];
+  for (let i = 0; i < 5; i++) {
+    const len = (FLAP_Z1 - FLAP_Z0) / 5;
+    const k = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, len - 0.4, 24), i % 2 ? plainCaseMat : flapMat);
+    k.rotation.x = Math.PI / 2; k.position.z = FLAP_Z0 + len * (i + 0.5) - (FLAP_Z0 + FLAP_Z1) / 2;
+    k.userData.onCase = !!(i % 2);
+    k.userData.dz = k.position.z;
+    knuckles.push(k);
+  }
+  const magGeo = new THREE.CylinderGeometry(3, 3, 0.6, 20);
+  const flapMags = [-14, 14].map(z => { const m = new THREE.Mesh(magGeo, magMat); flapPivot.add(m); m.userData.z = z; return m; });
+
+  // base mode only: steel base plate, main hinge along the straight outer edge, strut slot
+  const basePlate = new THREE.Mesh(undefined, baseMat); basePlate.castShadow = basePlate.receiveShadow = true; base.add(basePlate);
+  const baseMarker = massMarker(base, 0, new THREE.Vector3());
+  const baseBumpers = [[10, -22], [10, 20], [100, -14], [100, 30]].map(([u, z]) => {
+    const b = new THREE.Mesh(bumperGeo, padMat); b.position.set(-u, -PAD / 2, z); base.add(b); return b;
+  });
+  const mainKnuckles = [];
+  const nK = 5, kLen = (STRAIGHT_Z1 - STRAIGHT_Z0) / nK;
+  for (let i = 0; i < nK; i++) {
+    const k = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 2.8, kLen - 0.4, 24), i % 2 ? plainCaseMat : baseMat);
+    k.rotation.x = Math.PI / 2; k.position.z = STRAIGHT_Z0 + kLen * (i + 0.5);
+    k.userData.onCase = !!(i % 2);
+    mainKnuckles.push(k);
+  }
+  const mainPin = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, STRAIGHT_Z1 - STRAIGHT_Z0 + 4, 16), steelMat);
+  mainPin.rotation.x = Math.PI / 2; mainPin.position.z = (STRAIGHT_Z0 + STRAIGHT_Z1) / 2; base.add(mainPin);
+  const slot = new THREE.Group(); base.add(slot);
+  // tab on the strut's end that drops through a slot cut in the base plate
+  const TAB_L = 3, TAB_W = 30;
+  const strutTab = new THREE.Mesh(new THREE.BoxGeometry(TAB_L, FLAP_T, TAB_W), flapMat); flapPivot.add(strutTab);
+  const tipMag = new THREE.Mesh(magGeo, magMat); flapPivot.add(tipMag);
+
+  // sunk base only: plate strut cut from the plate's window, hinged on the plate; groove in the case
+  const nestStrutPivot = new THREE.Group(); base.add(nestStrutPivot);
+  const nestStrut = new THREE.Mesh(undefined, baseMat); nestStrut.castShadow = true; nestStrutPivot.add(nestStrut);
+  const nestStrutMarker = massMarker(nestStrutPivot, 0, new THREE.Vector3()); markers.push(nestStrutMarker);
+  const nestKnuckles = [-1, 1].map(sgn => {
+    const k = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 8, 20), plainCaseMat);
+    k.rotation.x = Math.PI / 2; k.position.z = sgn * (NEST_W / 2 - 4); nestStrutPivot.add(k); return k;
+  });
+  const nestTipMag = new THREE.Mesh(magGeo, magMat); nestStrutPivot.add(nestTipMag);
+  const groove = new THREE.Mesh(new THREE.BoxGeometry(4, 0.2, NEST_W + 1), new THREE.MeshStandardMaterial({ color: 0x15181b, roughness: 1 }));
+  body.add(groove);
+
+  const modeLabels = [];
+  if (!mirror) {
+    const L = (text, obj, pos, mode) => { const l = label(text, obj, pos); l.userData.mode = mode; modeLabels.push(l); };
+    L('kickstand (swings on a steel pin)', flapPivot, new THREE.Vector3(-30, -4, 0), 'kick');
+    L('strut (swings on a steel pin)', flapPivot, new THREE.Vector3(-30, -4, 0), 'base');
+    L('hard stop + magnet at the hinge', flapPivot, new THREE.Vector3(0, 0, 26), 'kick');
+    L('silicone strip on 75° bevel = pivot', body, new THREE.Vector3(-1, 3, -26), 'kick');
+    L('steel weights in floor pockets', body, new THREE.Vector3(uToX(14), 1, 22), 'kick');
+    L('nice!view + USB-C (back end)', body, new THREE.Vector3(NX, TOP_Z + 6, NZ - 22), 'both');
+    L('steel base plate', base, new THREE.Vector3(-90, 2, 30), 'base');
+    L('main hinge: steel pin, free to swing', base, new THREE.Vector3(0, 4, STRAIGHT_Z0 - 4), 'base');
+    L('strut tab drops through a slot in the plate; magnet in the tip grabs the steel', slot, new THREE.Vector3(0, 4, 0), 'base');
+    L('steel base plate, sunk flush into the case bottom', base, new THREE.Vector3(-85, 2, 30), 'nest');
+    L('main hinge, set in from the edge; the bevel lets it roll', base, new THREE.Vector3(0, 4, STRAIGHT_Z0 - 4), 'nest');
+    L('strut: the offcut from the plate window, hinged on the plate', nestStrutPivot, new THREE.Vector3(-30, 4, 0), 'nest');
+    L('strut tip clicks into a groove; magnet holds it', groove, new THREE.Vector3(0, -2, 0), 'nest');
+  }
+
+  function rebuild() {
+    const th = P.ang * deg, kick = P.mode === 'kick', nest = P.mode === 'nest';
+    const zp = nest ? nestPivotZ() : 0;
+    body.position.set(P.mode === 'base' ? -BEVEL_B : 0, -zp, 0);
+    if (kick || nest) bevelLocal.set(new THREE.Vector3(-Math.sin(th), Math.cos(th), 0), 0);
+    else bevelLocal.set(new THREE.Vector3(0, 1, 0), 1000);
+    const faceLen = BEVEL_B / Math.cos(th);
+    bevelStrip.geometry.dispose();
+    bevelStrip.geometry = new THREE.BoxGeometry(faceLen, PAD, 46);
+    bevelStrip.position.set(BEVEL_B / 2 + Math.sin(th) * PAD / 2, BEVEL_B * Math.tan(th) / 2 - Math.cos(th) * PAD / 2, 0);
+    bevelStrip.rotation.z = th;
+    bevelStrip.visible = kick;
+    for (const b of caseBumpers) b.visible = kick;
+    flapFoot.visible = kick;
+    base.visible = !kick;
+
+    const hx = uToX(P.uh);
+    const tabL = kick ? 0 : TAB_L;
+    const recess = rectPath(hx - P.fl - tabL - 1.5, hx + 3.5, FLAP_Z0 - 1, FLAP_Z1 + 1);
+    const pockets = [-11, 11].map(z => rectPath(uToX(22), uToX(6), z - 9, z + 9));
+    const nestOutline = offsetPolygon(caseLocal, -RIM);
+    const bottomShape = shapeFrom(caseLocal);
+    if (nest) bottomShape.holes.push(shapeFrom(offsetPolygon(caseLocal, -RIM + 0.3)));
+    else bottomShape.holes.push(recess, ...pockets);
+    parts.bottom.geometry?.dispose(); parts.bottom.geometry = extrude(bottomShape, 0, RECESS);
+    for (const w of weights) { w.visible = !nest; w.userData.marker.userData.mass = nest ? 0 : WEIGHT_MASS; }
+    flapPivot.visible = !nest;
+    parts.top.geometry?.dispose(); parts.top.geometry = extrude(shapeFrom(caseLocal), RECESS, TOP_Z - RECESS);
+
+    flapPivot.position.set(hx, RECESS / 2, (FLAP_Z0 + FLAP_Z1) / 2);
+    flap.geometry?.dispose();
+    flap.geometry = new RoundedBoxGeometry(P.fl, FLAP_T, FLAP_Z1 - FLAP_Z0, 2, 1);
+    flap.material = P.steelFlap ? flapSteelMat : flapMat;
+    flap.position.set(-P.fl / 2, 0, 0);
+    flapMarker.position.set(-P.fl / 2, 0, 0);
+    flapMarker.userData.mass = nest ? 0 : P.fl * (FLAP_Z1 - FLAP_Z0) * (P.steelFlap ? 2 * STEEL : FLAP_T * NYLON);
+    flapEnd.position.set(-P.fl, -FLAP_T / 2, 0);
+    flapFoot.position.set(-P.fl + 1.6, -FLAP_T / 2 - 0.3, 0);
+    strutTab.material = flap.material;
+    strutTab.position.set(-P.fl - TAB_L / 2 + 0.5, 0, 0);
+    strutTab.visible = !kick;
+    tipMag.position.set(-P.fl + 4, -FLAP_T / 2 - 0.3, 0);
+    tipMag.visible = !kick;
+    for (const m of flapMags) { m.position.set(-P.fl + 6, FLAP_T / 2 + 0.3, m.userData.z); }
+    for (const k of knuckles) {
+      k.parent?.remove(k);
+      if (k.userData.onCase) { body.add(k); k.visible = !nest; k.position.set(hx, RECESS / 2, (FLAP_Z0 + FLAP_Z1) / 2 + k.userData.dz); }
+      else { flapPivot.add(k); k.position.set(0, 0, k.userData.dz); }
+    }
+
+    // base plate shares the case footprint so the case folds down flush onto it
+    const baseT = Math.max(P.baseT, 0.01);
+    const baseOutline = caseLocal.map(([X, Z]) => [X - BEVEL_B, Z]);
+    // slot sits where the strut foot lands at full tent
+    const g = flapGeom(th);
+    const reach = P.uh * Math.cos(th) + (g.reaches ? Math.sqrt(P.fl ** 2 - g.drop ** 2) : 0);
+    const baseShape = shapeFrom(baseOutline);
+    baseShape.holes.push(rectPath(-reach - 5.5, -reach + 1.5, (FLAP_Z0 + FLAP_Z1) / 2 - TAB_W / 2 - 1, (FLAP_Z0 + FLAP_Z1) / 2 + TAB_W / 2 + 1));
+    basePlate.geometry?.dispose();
+    basePlate.geometry = extrude(baseShape, 0, baseT);
+    basePlate.visible = P.baseT > 0;
+    const bc = polyCentroid(baseOutline);
+    baseMarker.position.set(bc.x, baseT / 2, bc.z);
+    baseMarker.userData.mass = kick ? 0 : bc.area * P.baseT * STEEL;
+    markers.includes(baseMarker) || markers.push(baseMarker);
+    for (const k of mainKnuckles) { base.add(k); k.position.set(0, baseT, k.position.z); }
+    mainPin.position.y = baseT;
+
+    // sunk base: plate fills the case's bottom rim, with a window that the strut folds into
+    nestStrutPivot.visible = groove.visible = nest;
+    if (nest) {
+      const t = nestBaseT(), f = P.uh, L = P.fl;
+      const win = [-(f + L + 1), -(f - 2.5), NEST_Z - NEST_W / 2 - 0.5, NEST_Z + NEST_W / 2 + 0.5];
+      const nestShape = shapeFrom(nestOutline);
+      nestShape.holes.push(rectPath(...win));
+      basePlate.geometry.dispose();
+      basePlate.geometry = extrude(nestShape, 0, t);
+      basePlate.visible = true;
+      const nc = polyCentroid(nestOutline);
+      const winArea = (win[1] - win[0]) * (win[3] - win[2]);
+      const winCx = (win[0] + win[1]) / 2, winCz = (win[2] + win[3]) / 2;
+      const plateArea = nc.area - winArea;
+      baseMarker.position.set((nc.x * nc.area - winCx * winArea) / plateArea, t / 2, (nc.z * nc.area - winCz * winArea) / plateArea);
+      baseMarker.userData.mass = plateArea * t * STEEL;
+      for (const k of mainKnuckles) { k.geometry.dispose(); k.geometry = new THREE.CylinderGeometry(2.2, 2.2, kLen - 0.4, 24); k.position.set(0, zp, k.position.z); }
+      mainPin.position.y = zp;
+      nestStrutPivot.position.set(-f, t / 2, NEST_Z);
+      nestStrut.geometry?.dispose();
+      nestStrut.geometry = new RoundedBoxGeometry(L, t, NEST_W, 2, 0.6);
+      nestStrut.position.set(-L / 2, 0, 0);
+      nestStrutMarker.position.set(-L / 2, 0, 0);
+      nestStrutMarker.userData.mass = L * NEST_W * t * STEEL;
+      nestTipMag.position.set(-L + 4, t / 2 + 0.3, 0);
+      const g2 = nestGeom(th);
+      groove.position.set(-g2.s, RECESS - 0.05, NEST_Z);
+    } else {
+      nestStrutMarker.userData.mass = 0;
+      for (const k of mainKnuckles) { k.geometry.dispose(); k.geometry = new THREE.CylinderGeometry(2.8, 2.8, kLen - 0.4, 24); }
+    }
+    slot.position.set(-reach - 2, baseT, (FLAP_Z0 + FLAP_Z1) / 2);
+    for (const l of modeLabels) l.userData.modeOk = l.userData.mode === 'both' || l.userData.mode === P.mode;
+    applyLabelVisibility();
+  }
+
+  function pose(t) {
+    const th = P.ang * deg;
+    base.position.y = PAD;
+    if (P.mode === 'nest') {
+      // tilt first, then swing the strut up into the groove
+      const phi = th * Math.min(1, t / NEST_SPLIT);
+      const k = Math.max(0, (t - NEST_SPLIT) / (1 - NEST_SPLIT));
+      const e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+      pivot.rotation.z = -phi;
+      pivot.position.y = PAD + nestPivotZ();
+      nestStrutPivot.rotation.z = -nestGeom(th).beta * e;
+      return;
+    }
+    const phi = t * th;
+    pivot.rotation.z = -phi;
+    pivot.position.y = P.mode === 'kick' ? PAD : PAD + Math.max(P.baseT, 0);
+    flapPivot.rotation.z = phi + flapGeom(phi).lift;
+  }
+
+  function updateClip() { bevelWorld.copy(bevelLocal).applyMatrix4(pivot.matrixWorld); }
+
+  function setXray(on) {
+    for (const m of [parts.bottom.material, parts.top.material]) { m.transparent = on; m.opacity = on ? 0.25 : 1; m.depthWrite = !on; }
+  }
+
+  return { side, pivot, body, base, basePlate, flapEnd, markers, caseParts: [parts.bottom, parts.top], rebuild, pose, updateClip, setXray };
+}
+
+let labelsOn = true;
+function applyLabelVisibility() { for (const l of labels) l.visible = labelsOn && (l.userData.modeOk ?? true); }
+
+const halves = [buildHalf(false), buildHalf(true)];
+
+// --- layout + stats ----------------------------------------------------------
+const box = new THREE.Box3();
+function layout() {
+  laptop.scale.set(P.lw, P.lh, 260);
+  laptop.position.set(0, P.lh / 2, 0);
+  for (const h of halves) h.pose(P.t);
+  // keep each half just clear of the laptop case
+  const R = halves[0];
+  R.pivot.position.x = R.base.position.x = 0; R.side.updateMatrixWorld(true);
+  box.makeEmpty();
+  box.expandByObject(R.pivot, true);
+  if (R.base.visible && R.basePlate.visible) box.expandByObject(R.basePlate, true);
+  const xp = P.lw / 2 + P.gap - box.min.x;
+  for (const h of halves) { h.pivot.position.x = h.base.position.x = xp; h.side.updateMatrixWorld(true); h.updateClip(); }
+}
+
+// Force on the worst key that rolls the right half inward over its innermost support,
+// and the force that slides it, both with no laptop case. Uses the full-tent pose.
+const MU = 0.8, G = 9.81e-3;   // N per gram
+function stability(R) {
+  const v = new THREE.Vector3();
+  let W = 0, cx = 0;
+  for (const m of R.markers) { if (!m.userData.mass) continue; m.getWorldPosition(v); W += m.userData.mass; cx += m.userData.mass * v.x; }
+  cx /= W;
+  let ex;
+  if (P.mode === 'kick') { R.flapEnd.getWorldPosition(v); ex = v.x; }
+  else { box.setFromObject(R.basePlate, true); ex = box.min.x; }
+  const n = new THREE.Vector3(0, 1, 0).applyQuaternion(R.body.getWorldQuaternion(new THREE.Quaternion()));
+  const f = n.clone().negate();
+  let worst = 0;
+  R.body.traverse(o => {
+    if (!o.userData.keycap) return;
+    const q = o.getWorldPosition(new THREE.Vector3()).addScaledVector(n, CAP_H / 2);
+    worst = Math.max(worst, (q.x - ex) * f.y - q.y * f.x);
+  });
+  const resist = W * G * (cx - ex);
+  const tip = worst > 0 ? resist / worst : Infinity;
+  const slide = MU * W * G / Math.max(1e-6, Math.abs(f.x) - MU * Math.abs(f.y));
+  return { W, tip, slide, comIn: cx - ex };
+}
+
+const gf = N => isFinite(N) ? (N / 9.81e-3).toFixed(0) + ' gf' : 'never';
+function stats() {
+  const th = P.ang * deg, kick = P.mode === 'kick';
+  const { hingeH, drop, reaches: ok, lift } = flapGeom(th);
+  const flapDesk = lift / deg;
+  const stop = P.ang + flapDesk;
+  const reach = (P.uh - pivotOffset()) * Math.cos(th) + (ok ? Math.sqrt(P.fl ** 2 - drop ** 2) : 0);
+  const fits = P.uh + P.fl + (kick ? 0 : 3) + 2 <= CASE_INNER_U - WALL;
+  const R = halves[0];
+  const saveT = P.t; R.pose(1); R.side.updateMatrixWorld(true);
+  let low = Infinity, top = -Infinity;
+  R.body.traverse(o => { if (o.userData.keycap) { box.setFromObject(o, true); low = Math.min(low, box.min.y); top = Math.max(top, box.max.y); } });
+  // lowest point of the case shell, allowing for the bevel clip
+  const cv = new THREE.Vector3(); let caseLow = Infinity;
+  R.updateClip();
+  const clipPlane = new THREE.Plane();
+  for (const part of R.caseParts) {
+    clipPlane.copy(part.material.clippingPlanes[0] ?? new THREE.Plane(new THREE.Vector3(0, 1, 0), 1e6));
+    const pos = part.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      cv.fromBufferAttribute(pos, i).applyMatrix4(part.matrixWorld);
+      if (clipPlane.distanceToPoint(cv) < 0) continue;
+      caseLow = Math.min(caseLow, cv.y);
+    }
+  }
+  caseLow = Math.max(caseLow, 0);
+  const st = stability(R);
+  R.pose(saveT); R.side.updateMatrixWorld(true); R.updateClip();
+  const nest = P.mode === 'nest';
+  const thick = CAP_Z0 + CAP_H + PAD + (kick || nest ? 0 : P.baseT);
+  const name = kick ? 'Kickstand' : 'Strut';
+  if (nest) {
+    const g = nestGeom(th);
+    const plateIn = CASE_INNER_U - BEVEL_B - RIM;
+    const nestFits = P.uh + P.fl + 1 <= plateIn - 2;
+    const caseLen = CASE_INNER_U - BEVEL_B - 3;
+    const rowsN = [
+      ['Weight per half', st.W.toFixed(0) + ' g'],
+      ['Tips inward at (no laptop case)', gf(st.tip)],
+      ['Slides at (no laptop case)', gf(st.slide)],
+      ['Strut angle to base', g.ok ? (180 - g.beta / deg).toFixed(0) + '°' : '–'],
+      ['Strut meets case at (from hinge)', g.ok ? g.s.toFixed(0) + ' mm' : '–'],
+      ['Steel plate (sunk)', nestBaseT().toFixed(1) + ' mm'],
+      ['Lowest keycap edge above desk', low.toFixed(1) + ' mm'],
+      ['Lowest point of case above desk', caseLow.toFixed(1) + ' mm'],
+      ['Top of raised half above desk', top.toFixed(0) + ' mm'],
+      ['Folded thickness (with feet)', thick.toFixed(1) + ' mm'],
+      ['Half footprint folded', (CASE_INNER_U).toFixed(0) + ' × ' + (89.6 + 2 * WALL).toFixed(0) + ' mm'],
+    ];
+    document.getElementById('stats').innerHTML = rowsN.map(r => '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>').join('');
+    const w = [];
+    if (!g.ok) w.push('Strut too short to reach the case from this hinge position.');
+    if (g.ok && g.s > caseLen) w.push('Strut meets the case beyond its far edge: shorten it or move its hinge in.');
+    if (!nestFits) w.push('Strut does not fit in the plate window when folded: shorten it or move its hinge out.');
+    if (P.baseT > RECESS - 0.5) w.push('Sunk plate is capped at ' + (RECESS - 0.5) + ' mm to fit the case recess.');
+    document.getElementById('warn').textContent = w.join(' ');
+    return;
+  }
+  const rows = [
+    ['Weight per half', st.W.toFixed(0) + ' g'],
+    ['Tips inward at (no laptop case)', gf(st.tip)],
+    ['Slides at (no laptop case)', gf(st.slide)],
+    [name + ' stop angle', ok ? stop.toFixed(0) + '°' : '–'],
+    [name + ' angle to ' + (kick ? 'desk' : 'base'), ok ? flapDesk.toFixed(0) + '°' : '–'],
+    [name + ' foot in from pivot', reach.toFixed(0) + ' mm'],
+    ['Lowest keycap edge above desk', low.toFixed(1) + ' mm'],
+    ['Lowest point of case above desk', caseLow.toFixed(1) + ' mm'],
+    ['Top of raised half above desk', top.toFixed(0) + ' mm'],
+    ['Folded thickness (with feet)', thick.toFixed(1) + ' mm'],
+    ['Half footprint folded', (CASE_INNER_U).toFixed(0) + ' × ' + (89.6 + 2 * WALL).toFixed(0) + ' mm'],
+  ];
+  document.getElementById('stats').innerHTML = rows.map(r => '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>').join('');
+  const w = [];
+  if (!ok) w.push(name + ' too short to reach the ' + (kick ? 'desk' : 'base') + ' from this hinge position.');
+  if (!fits) w.push(name + ' does not fit inside the case when folded: shorten it or move the hinge out.');
+  document.getElementById('warn').textContent = w.join(' ');
+}
+
+// --- UI ------------------------------------------------------------------------------
+const ids = ['t', 'ang', 'uh', 'fl', 'lw', 'lh', 'gap', 'baseT'];
+const units = { t: v => Math.round(v * 100) + '%', ang: v => v + '°', baseT: v => v ? v + ' mm' : 'none' };
+function syncLabels() { for (const k of ids) document.getElementById(k + 'v').textContent = (units[k] || (v => v))(P[k]); }
+let dirty = true;
+for (const k of ids) document.getElementById(k).addEventListener('input', e => {
+  P[k] = parseFloat(e.target.value); anim = null;
+  if (['ang', 'uh', 'fl', 'baseT'].includes(k)) for (const h of halves) h.rebuild();
+  syncLabels(); dirty = true;
+});
+document.getElementById('xray').addEventListener('change', e => { for (const h of halves) h.setXray(e.target.checked); });
+document.getElementById('labels').addEventListener('change', e => { labelsOn = e.target.checked; applyLabelVisibility(); });
+document.getElementById('steelFlap').addEventListener('change', e => { P.steelFlap = e.target.checked; for (const h of halves) h.rebuild(); dirty = true; });
+function setMode(mode) {
+  P.mode = mode;
+  Object.assign(P, MODE_DEFAULTS[mode]);
+  for (const k of ['uh', 'fl']) document.getElementById(k).value = P[k];
+  for (const m of ['nest', 'base', 'kick']) document.getElementById('mode-' + m).classList.toggle('primary', mode === m);
+  const name = mode === 'kick' ? 'Kickstand' : 'Strut';
+  document.getElementById('uhl').textContent = mode === 'nest' ? 'Strut hinge on plate, from main hinge' : name + ' hinge from outer edge';
+  document.getElementById('fll').textContent = name + ' length';
+  document.getElementById('baseRow').style.display = mode === 'kick' ? 'none' : '';
+  document.getElementById('steelFlap').parentElement.style.display = mode === 'nest' ? 'none' : '';
+  document.querySelector('[data-view="back"]').textContent = name + ' side';
+  for (const h of halves) h.rebuild();
+  syncLabels(); dirty = true;
+}
+document.getElementById('mode-base').onclick = () => setMode('base');
+document.getElementById('mode-nest').onclick = () => setMode('nest');
+document.getElementById('mode-kick').onclick = () => setMode('kick');
+document.getElementById('laptop').addEventListener('change', e => { laptop.visible = e.target.checked; });
+
+let anim = null;
+function animateTo(target) { anim = { from: P.t, to: target, start: performance.now(), dur: 1400 }; }
+document.getElementById('raise').onclick = () => animateTo(1);
+document.getElementById('fold').onclick = () => animateTo(0);
+
+const views = {
+  iso: [[260, 300, 560], [0, 40, 0]],
+  front: [[0, 70, 700], [0, 50, 0]],
+  top: [[0, 700, 1], [0, 0, 0]],
+  back: [[-40, 110, 230], [170, 45, 0]],
+  under: [[230, -230, 150], [175, 0, 0]],
+  end: [[200, 70, 330], [200, 45, 0]],
+};
+document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => {
+  const [p, t] = views[b.dataset.view];
+  camera.position.set(...p); controls.target.set(...t); controls.update();
+  const under = b.dataset.view === 'under';
+  desk.visible = !under;
+  laptop.visible = !under && b.dataset.view !== 'back' && document.getElementById('laptop').checked;
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight); labelRenderer.setSize(innerWidth, innerHeight);
+});
+
+for (const h of halves) h.rebuild();
+setMode(P.mode);
+// URL hash shortcuts, e.g. #view=end&t=0.5
+const hp = new URLSearchParams(location.hash.slice(1));
+if (hp.has('mode')) setMode(hp.get('mode'));
+if (hp.has('steel')) { P.steelFlap = true; document.getElementById('steelFlap').checked = true; for (const h of halves) h.rebuild(); }
+if (hp.has('t')) { P.t = parseFloat(hp.get('t')); document.getElementById('t').value = P.t; }
+if (hp.has('xray')) { document.getElementById('xray').checked = true; for (const h of halves) h.setXray(true); }
+if (hp.has('view')) document.querySelector('[data-view="' + hp.get('view') + '"]')?.click();
+syncLabels();
+
+function frame(now) {
+  if (anim) {
+    const k = Math.min(1, (now - anim.start) / anim.dur);
+    const e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+    P.t = anim.from + (anim.to - anim.from) * e;
+    document.getElementById('t').value = P.t;
+    syncLabels(); dirty = true;
+    if (k >= 1) anim = null;
+  }
+  if (dirty) { layout(); stats(); dirty = false; }
+  controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
